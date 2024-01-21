@@ -51,13 +51,19 @@ class Node:
             other.val, self.val)
 
     def __rmul__(self, other):
-        return self.__mul__(other)
+        return other.__mul__(self)
 
-    def __div__(self, other):
+    def __truediv__(self, other):
         if type(other) != Node:
             return self.unary_operation(self.val/other, 1/other)
         return self.binary_operation(other, self.val/other.val, 1/other.val,
             -self.val / (other.val**2))
+
+    def __rtruediv__(self, other):
+        if type(other) != Node:
+            return self.unary_operation(other/self.val, -self.val / (other ** 2))
+        return self.binary_operation(other, other.val/self.val,
+            -self.val / (other ** 2), 1/other.val)
 
     def __pow__(self, other):
         if type(other) != Node:
@@ -107,6 +113,40 @@ class Node:
     def tan(self):
         return self.unary_operation(math.tan(self.val), 1/(math.cos(self.val)**2))
 
+    def __neg__(self):
+        return self.unary_operation(-self.val, -1)
+
+    # Make comparisons works like they do with numbers
+    def __eq__(self, other):
+        if type(other) != Node:
+            return self.val == other
+        return self.val == other.val
+
+    def __ne__(self, other):
+        if type(other) != Node:
+            return self.val != other
+        return self.val != other.val
+
+    def __gt__(self, other):
+        if type(other) != Node:
+            return self.val > other
+        return self.val > other.val
+
+    def __lt__(self, other):
+        if type(other) != Node:
+            return self.val < other
+        return self.val < other.val
+
+    def __ge__(self, other):
+        if type(other) != Node:
+            return self.val >= other
+        return self.val >= other.val
+
+    def __le__(self, other):
+        if type(other) != Node:
+            return self.val <= other
+        return self.val <= other.val
+
 # Make function calls more intuitive and beautiful
 def max(x, y):
     return x.max(y)
@@ -148,6 +188,7 @@ def derivative(f, x):
 
 # Test the automatic differentiation
 
+# 1. y = log(x1) + x1 * x2 - sin(x2) + 1
 # c = ln(x1)
 # d = x1 * x2
 # e = sin(x2)
@@ -156,31 +197,29 @@ def derivative(f, x):
 # y = g + 1
 # dy/dx1 = dy/dg * dg/df * (df/dc * dc/x1 + df/dd * dd/dx1)
 # dy/dx2 = dy/dg * (dg/df * df/dd * dd/dx2 + dg/de * de/dx2)
-def test1():
-    print("y = ln(x1) + x1*x2 - sin(x2) + 1")
-    x1, x2 = Node(2), Node(5)
-    y = log(x1) + x1 * x2 - sin(x2) + 1
-    print("x1 =", x1, "x2 =", x2, "y =", y)
-    # Should be 5.5, 1.716
-    print("dy/dx1 =", derivative(y, x1), "dy/dx2 =", derivative(y, x2))
 
-# c = a + b
-# d = b + 1
-# e = c * d
-# de/da = de/dc * dc/da
-# de/db = de/dc * dc/db + de/dd * dd/db
-def test2():
-    print("e = (a + b) * (b + 1)")
-    a, b = Node(2), Node(1)
-    e = (a + b) * (b + 1)
-    print("a =", a, "b =", b, "e =", e)
-    # Should be 2, 5
-    print("de/da =", derivative(e, a), "de/db =", derivative(e, b))
+# 2. y = (x1 + x2) * (x2 + 1)
+# c = x1 + x2
+# d = x2 + 1
+# y = c * d
+# dy/dx1 = dy/dc * dc/dx1
+# dy/dx2 = dy/dc * dc/dx2 + dy/dd * dd/dx2
+def test(f, x1, x2):
+    x1, x2 = Node(x1), Node(x2)
+    y = f(x1, x2)
+    print("x1 =", x1, "x2 =", x2, "y =", y)
+    print("Auto Diff")
+    print("dy/dx1 =", derivative(y, x1), "dy/dx2 =", derivative(y, x2))
+    print("Numerical Diff")
+    h = 0.00001
+    print("dy/dx1 = ", (f(x1+h, x2) - f(x1-h, x2)) / (h * 2), 
+        "dy/dx2 = ", (f(x1, x2+h) - f(x1, x2-h)) / (h * 2))
 
 def main():
-    test1()
-    print()
-    test2()
+    print("y = ln(x1) + x1*x2 - sin(x2) + 1")
+    test(lambda x1, x2: log(x1) + x1 * x2 - sin(x2) + 1, 2, 5)
+    print("\ny = (x1 + x2) * (x2 + 1)")
+    test(lambda x1, x2: (x1 + x2) * (x2 + 1), 2, 1)
 
 if __name__ == "__main__":
     main()
