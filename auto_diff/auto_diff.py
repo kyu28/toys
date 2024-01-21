@@ -5,35 +5,20 @@ import math
 # Use chain rule to get the derivative by calling derivative(f, x)
 nodes = []
 
-class Edge:
-    src, dest, dval = 0, 0, 0
-    def __init__(self, src, dest, dval):
-        self.src, self.dest, self.dval = src, dest, dval
-
 class Node:
     # The Number, the product of the derivative, the index in nodes list
-    val, deriv_prod, index = None, 0, None
-    # The edges connected to this node
-    src = [] 
+    val, deriv_prod, index, in_edges = None, 0, None, []
 
     # Generate result node and connect computational graph
     def unary_operation(self, result, dfdx):
-        result = Node(result)
-        result.src = [Edge(self.index, result.index, dfdx)]
-        nodes.append(result)
-        return result
+        return Node(result, [{ "src": self.index, "dval": dfdx }])
 
     def binary_operation(self, other, result, dfdx, dfdy):
-        result = Node(result)
-        result.src = [
-            Edge(self.index, result.index, dfdx),
-            Edge(other.index, result.index, dfdy)]
-        nodes.append(result)
-        return result
+        return Node(result, [{ "src": self.index, "dval": dfdx },
+            { "src": other.index, "dval": dfdy }])
 
-    def __init__(self, val):
-        self.val = val
-        self.index = len(nodes)
+    def __init__(self, val, in_edges=[]):
+        self.val, self.index, self.in_edges = val, len(nodes), in_edges
         nodes.append(self)
 
     # Print number
@@ -147,7 +132,7 @@ def cos(x):
 def tan(x):
     return x.tan()
 
-# The real trick
+# Use BFS to filled up derivatives in computational graph from f
 def derivative(f, x):
     for node in nodes:
         node.deriv_prod = 0
@@ -155,12 +140,11 @@ def derivative(f, x):
     q = [f]
     while len(q) != 0:
         n = q.pop(0)
-        for edge in n.src:
-            child = nodes[edge.src]
-            child.deriv_prod += n.deriv_prod * edge.dval
+        for edge in n.in_edges:
+            child = nodes[edge["src"]]
+            child.deriv_prod += n.deriv_prod * edge["dval"]
             q.append(child)
     return x.deriv_prod
-
 
 # Test the automatic differentiation
 
@@ -176,20 +160,22 @@ def test1():
     print("y = ln(x1) + x1*x2 - sin(x2) + 1")
     x1, x2 = Node(2), Node(5)
     y = log(x1) + x1 * x2 - sin(x2) + 1
-    print("x1 = ", x1, "dy/dx1 = ", derivative(y, x1)) # Should be 5.5
-    print("x2 = ", x2, "dy/dx2 = ", derivative(y, x2)) # Should be 1.716
+    print("x1 =", x1, "x2 =", x2, "y =", y)
+    # Should be 5.5, 1.716
+    print("dy/dx1 =", derivative(y, x1), "dy/dx2 =", derivative(y, x2))
 
 # c = a + b
 # d = b + 1
 # e = c * d
 # de/da = de/dc * dc/da
-# de/db = de/dc * dc/db + dd/db
+# de/db = de/dc * dc/db + de/dd * dd/db
 def test2():
     print("e = (a + b) * (b + 1)")
     a, b = Node(2), Node(1)
     e = (a + b) * (b + 1)
-    print("a = ", a, "de/da = ", derivative(e, a)) # Should be 2
-    print("b = ", b, "de/db = ", derivative(e, b)) # Should be 5
+    print("a =", a, "b =", b, "e =", e)
+    # Should be 2, 5
+    print("de/da =", derivative(e, a), "de/db =", derivative(e, b))
 
 def main():
     test1()
