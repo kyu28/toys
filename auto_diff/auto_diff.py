@@ -2,23 +2,25 @@ import math
 
 # Computational Graph
 # Calculate the derivative while evaluating the expression
-# Use chain rule to get the derivative by calling derivative(f, x)
-nodes = []
+# Use chain rule to get the derivatives by calling derivative(f)
+nodes, edges = [], []
 
 class Node:
-    # The Number, the product of the derivative, the index in nodes list
-    val, deriv_prod, index, in_edges = None, 0, None, []
+    # The Number, the index in nodes list, edges
+    val, index, in_edge_indices = None, None, []
 
     # Generate result node and connect computational graph
     def unary_operation(self, result, dfdx):
-        return Node(result, [{ "src": self.index, "dval": dfdx }])
+        edges.append({ "src": self.index, "dval": dfdx })
+        return Node(result, [len(edges) - 1])
 
     def binary_operation(self, other, result, dfdx, dfdy):
-        return Node(result, [{ "src": self.index, "dval": dfdx },
-            { "src": other.index, "dval": dfdy }])
+        edges.append({ "src": self.index, "dval": dfdx })
+        edges.append({ "src": other.index, "dval": dfdy })
+        return Node(result, [len(edges) - 2, len(edges) - 1])
 
-    def __init__(self, val, in_edges=[]):
-        self.val, self.index, self.in_edges = val, len(nodes), in_edges
+    def __init__(self, val, e_indices=[]):
+        self.val, self.index, self.in_edge_indices = val, len(nodes), e_indices
         nodes.append(self)
 
     # Print number
@@ -172,19 +174,35 @@ def cos(x):
 def tan(x):
     return x.tan()
 
-# Use BFS to filled up derivatives in computational graph from f
-def derivative(f, x):
-    for node in nodes:
-        node.deriv_prod = 0
-    f.deriv_prod = 1
+# Use topo sort to filled up derivatives in computational graph from f
+# Computational graph is a DAG
+def derivative(f):
+    # Init all derivatives and out degrees to 0, O(n)
+    grads, out_degrees = [], []
+    for i in range(f.index + 1):
+        grads.append(0)
+        out_degrees.append(0)
+    # df/df = 1
+    grads[f.index] = 1
+    # Set out degrees, O(e)
     q = [f]
-    while len(q) != 0:
-        n = q.pop(0)
-        for edge in n.in_edges:
-            child = nodes[edge["src"]]
-            child.deriv_prod += n.deriv_prod * edge["dval"]
-            q.append(child)
-    return x.deriv_prod
+    while len(q) > 0:
+        node = q.pop(0)
+        for e_index in node.in_edge_indices:
+            ch_index = edges[e_index]["src"]
+            out_degrees[ch_index] += 1
+            q.append(nodes[ch_index])
+    # Topo sort, O(e)
+    q = [f]
+    while len(q) > 0:
+        node = q.pop(0)
+        for e_index in node.in_edge_indices:
+            ch_index = edges[e_index]["src"]
+            grads[ch_index] += grads[node.index] * edges[e_index]["dval"]
+            out_degrees[ch_index] -= 1
+            if out_degrees[ch_index] == 0:
+                q.append(nodes[ch_index])
+    return grads
 
 # Test the automatic differentiation
 
@@ -209,7 +227,8 @@ def test(f, x1, x2):
     y = f(x1, x2)
     print("x1 =", x1, "x2 =", x2, "y =", y)
     print("Auto Diff")
-    print("dy/dx1 =", derivative(y, x1), "dy/dx2 =", derivative(y, x2))
+    grads = derivative(y)
+    print("dy/dx1 =", grads[x1.index], "dy/dx2 =", grads[x2.index])
     print("Numerical Diff")
     h = 0.00001
     print("dy/dx1 = ", (f(x1+h, x2) - f(x1-h, x2)) / (h * 2), 
